@@ -4,8 +4,11 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'NovaCraft Ai',
-  description: 'App imported from Firebase Studio',
+  title: 'NovaCraft AI - Creative AI Image Studio',
+  description: 'Ultra-realistic & artistic AI image generator studio powered by continuous neural learning.',
+  icons: {
+    icon: '/icon.png',
+  },
 };
 
 export default function RootLayout({
