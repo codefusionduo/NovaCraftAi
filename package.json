@@ -10,6 +10,7 @@
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
     "start": "next start",
+    "start:all": "npx tsx src/startAll.ts",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
