@@ -33,7 +33,7 @@ async function trainVisionModelFromTelegram() {
 
   await client.connect();
 
-  const messages = await client.getMessages(TARGET_CHAT, { limit: 60 });
+  const messages = await client.getMessages(TARGET_CHAT, { limit: 500 });
   const photoMessages = messages.filter(m => m.media && m.media.className === "MessageMediaPhoto");
 
   console.log(`📡 Ingesting & processing ${photoMessages.length} images from group...`);

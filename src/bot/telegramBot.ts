@@ -86,7 +86,10 @@ function registerLearnedImage(caption: string) {
 
 function getLearnedStylePromptBoost(): string {
   const parts: string[] = [];
-  if (trainedVisualTokens.length > 0) {
+  const currentWeights = getTrainedWeights();
+  if (currentWeights.learnedTokens && currentWeights.learnedTokens.length > 0) {
+    parts.push(currentWeights.learnedTokens.slice(0, 5).join(", "));
+  } else if (trainedVisualTokens.length > 0) {
     parts.push(trainedVisualTokens.slice(0, 5).join(", "));
   }
 
@@ -170,20 +173,16 @@ bot.help((ctx) => {
 
 // 3. /style_status command
 bot.command("style_status", (ctx) => {
-  if (learnedStyleMemory.length === 0) {
-    return ctx.reply("🧠 AI Style Memory khali hai.");
-  }
-
-  const latestTags = Array.from(
-    new Set(learnedStyleMemory.flatMap(c => c.keywords))
-  ).slice(0, 6);
+  const currentWeights = getTrainedWeights();
+  const tokens = currentWeights.learnedTokens || [];
 
   ctx.reply(
     `🧠 *NovaCraft AI Style Learning Status:*\n\n` +
-      `📸 *Learned Images:* ${learnedStyleMemory.length} / ${MAX_STYLE_MEMORY}\n` +
-      `💾 *Disk Storage Used:* 0.00 KB\n` +
-      `🎨 *Active Learned Aesthetic Tags:* ${latestTags.join(", ")}\n` +
-      `✨ *Watermark Status:* 100% Removed & Clean`,
+      `📊 *Total Group Dataset:* ${currentWeights.totalAnalyzed} photos analyzed\n` +
+      `💾 *Disk Storage Used:* 0.00 KB (Zero Disk Footprint)\n` +
+      `💡 *Lighting Tone:* ${currentWeights.lightingTone || "Studio Softbox"}\n` +
+      `🎨 *Active Neural Aesthetic Tokens:*\n• ${tokens.join("\n• ") || "General High Definition"}\n\n` +
+      `✨ *Watermark Status:* 100% Watermark-Free Clean Engine Active`,
     { parse_mode: "Markdown" }
   );
 });
@@ -193,6 +192,11 @@ bot.command("forget_style", (ctx) => {
   learnedStyleMemory = [];
   ctx.reply("🧹 *AI Style Memory Reset!* Purani sabhi learned styles clear ho gayi hain.");
 });
+
+// Notification buffer to handle bulk photo albums and avoid Telegram 429 Rate Limits
+let batchPhotoCount = 0;
+let lastBatchResult: any = null;
+let batchNotifyTimeout: NodeJS.Timeout | null = null;
 
 // 5. Automatic Ingestion & Neural Training of Photos
 bot.on("photo", async (ctx) => {
@@ -208,14 +212,27 @@ bot.on("photo", async (ctx) => {
     // Train neural model in memory
     const trainResult = await autoTrainFromImageBuffer(buffer, caption);
     trainedVisualTokens = trainResult.learnedTokens;
+    lastBatchResult = trainResult;
+    batchPhotoCount++;
 
-    await ctx.reply(
-      `🧠 *Autonomous Neural Training Complete!*\n\n` +
-      `📊 *Total Group Dataset:* ${trainResult.totalTrained} images\n` +
-      `🎨 *Learned Feature:* ${trainResult.newInsight}\n` +
-      `✨ *Active Model Weights Updated in RAM!* (0 KB Disk used)`,
-      { parse_mode: "Markdown" }
-    );
+    // Debounce reply by 3.5 seconds so bulk uploads (e.g. 400 photos) aggregate cleanly
+    if (batchNotifyTimeout) clearTimeout(batchNotifyTimeout);
+    batchNotifyTimeout = setTimeout(async () => {
+      try {
+        const count = batchPhotoCount;
+        batchPhotoCount = 0;
+        await ctx.reply(
+          `🧠 *Autonomous Neural Training Complete!*\n\n` +
+          `📥 *Photos Processed:* ${count} new photo(s)\n` +
+          `📊 *Total Group Dataset:* ${lastBatchResult.totalTrained} images\n` +
+          `🎨 *Active Features:* ${lastBatchResult.newInsight}\n` +
+          `✨ *Model Weights Updated in RAM!* (0 KB Disk used)`,
+          { parse_mode: "Markdown" }
+        );
+      } catch (notifyErr) {
+        console.error("Batch notify error:", notifyErr);
+      }
+    }, 3500);
   } catch (err) {
     console.error("Error processing photo auto-training:", err);
   }

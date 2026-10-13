@@ -1,13 +1,9 @@
 {
-  "totalAnalyzed": 61,
+  "totalAnalyzed": 499,
   "contrastProfile": "high dynamic contrast (HDR)",
   "lightingTone": "studio softbox illumination",
   "paletteMood": "vibrant natural",
   "learnedTokens": [
-    "warm golden cinematic lighting",
-    "sunset amber tones",
-    "high dynamic range HDR",
-    "ultra crisp details",
     "high definition",
     "masterpiece composition",
     "sharp focus",
@@ -17,5 +13,5 @@
     "high dynamic range",
     "intense detail"
   ],
-  "updatedAt": "2026-10-12T08:11:35.415Z"
+  "updatedAt": "2026-10-13T05:51:43.548Z"
 }
