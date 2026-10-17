@@ -193,10 +193,32 @@ bot.command("forget_style", (ctx) => {
   ctx.reply("🧹 *AI Style Memory Reset!* Purani sabhi learned styles clear ho gayi hain.");
 });
 
+function escapeHtml(text: string): string {
+  return (text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+async function sendSafeMessage(chatId: number | string, text: string) {
+  try {
+    await bot.telegram.sendMessage(chatId, text, { parse_mode: "HTML" });
+  } catch (err) {
+    console.error("HTML send error, trying plain text fallback:", err);
+    try {
+      const plain = text.replace(/<[^>]+>/g, "");
+      await bot.telegram.sendMessage(chatId, plain);
+    } catch (fallbackErr) {
+      console.error("Failed to send fallback message:", fallbackErr);
+    }
+  }
+}
+
 // Notification buffer to handle bulk photo albums and avoid Telegram 429 Rate Limits
 let batchPhotoCount = 0;
 let lastBatchResult: any = null;
 let batchNotifyTimeout: NodeJS.Timeout | null = null;
+let lastTargetChatId: number | string | null = null;
 
 // 5. Automatic Ingestion & Neural Training of Photos
 bot.on("photo", async (ctx) => {
@@ -204,6 +226,9 @@ bot.on("photo", async (ctx) => {
     const photos = ctx.message.photo;
     const highestResPhoto = photos[photos.length - 1];
     const caption = ctx.message.caption || "";
+    lastTargetChatId = ctx.chat.id;
+
+    console.log(`📥 [Photo Ingestion] Photo received in chat: ${ctx.chat.id} (${(ctx.chat as any).title || ctx.chat.type})`);
 
     const fileLink = await ctx.telegram.getFileLink(highestResPhoto.file_id);
     const response = await fetch(fileLink.href);
@@ -215,26 +240,53 @@ bot.on("photo", async (ctx) => {
     lastBatchResult = trainResult;
     batchPhotoCount++;
 
-    // Debounce reply by 3.5 seconds so bulk uploads (e.g. 400 photos) aggregate cleanly
+    // Debounce reply by 2.5 seconds so bulk uploads / albums aggregate cleanly
     if (batchNotifyTimeout) clearTimeout(batchNotifyTimeout);
+    const targetChat = lastTargetChatId;
     batchNotifyTimeout = setTimeout(async () => {
       try {
         const count = batchPhotoCount;
         batchPhotoCount = 0;
-        await ctx.reply(
-          `🧠 *Autonomous Neural Training Complete!*\n\n` +
-          `📥 *Photos Processed:* ${count} new photo(s)\n` +
-          `📊 *Total Group Dataset:* ${lastBatchResult.totalTrained} images\n` +
-          `🎨 *Active Features:* ${lastBatchResult.newInsight}\n` +
-          `✨ *Model Weights Updated in RAM!* (0 KB Disk used)`,
-          { parse_mode: "Markdown" }
-        );
+        if (!targetChat || !lastBatchResult) return;
+
+        const msg =
+          `🧠 <b>Autonomous Neural Training Complete!</b>\n\n` +
+          `📥 <b>Photos Processed:</b> ${count} new photo(s)\n` +
+          `📊 <b>Total Group Dataset:</b> ${lastBatchResult.totalTrained} images\n` +
+          `🎨 <b>Active Features:</b> ${escapeHtml(lastBatchResult.newInsight)}\n` +
+          `✨ <b>Model Weights Updated in RAM!</b> (0 KB Disk used)`;
+
+        await sendSafeMessage(targetChat, msg);
+        console.log(`✅ Sent training completion message to ${targetChat} for ${count} photo(s).`);
       } catch (notifyErr) {
         console.error("Batch notify error:", notifyErr);
       }
-    }, 3500);
+    }, 2500);
   } catch (err) {
     console.error("Error processing photo auto-training:", err);
+  }
+});
+
+// Support images sent as uncompressed files
+bot.on("document", async (ctx) => {
+  try {
+    const doc = ctx.message.document;
+    if (doc.mime_type && doc.mime_type.startsWith("image/")) {
+      const fileLink = await ctx.telegram.getFileLink(doc.file_id);
+      const response = await fetch(fileLink.href);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const trainResult = await autoTrainFromImageBuffer(buffer, ctx.message.caption || "");
+      trainedVisualTokens = trainResult.learnedTokens;
+      await sendSafeMessage(
+        ctx.chat.id,
+        `🧠 <b>Image Document Processed & Trained!</b>\n\n` +
+        `📊 <b>Total Dataset:</b> ${trainResult.totalTrained} images\n` +
+        `🎨 <b>Features:</b> ${escapeHtml(trainResult.newInsight)}\n` +
+        `✨ <b>RAM Weights Updated!</b>`
+      );
+    }
+  } catch (err) {
+    console.error("Error processing document image:", err);
   }
 });
 
@@ -269,9 +321,7 @@ bot.on("channel_post", async (ctx) => {
     const post = ctx.channelPost;
     const channelChatId = post.chat.id;
 
-    if (CHANNEL_ID && String(channelChatId) !== String(CHANNEL_ID) && post.chat.username !== CHANNEL_ID.replace("@", "")) {
-      return;
-    }
+    console.log(`📡 [Channel Post] Received post in channel: ${channelChatId} (${(post.chat as any).title || "channel"})`);
 
     // Auto-train on channel photos
     if ("photo" in post && post.photo) {
@@ -286,21 +336,31 @@ bot.on("channel_post", async (ctx) => {
       const trainResult = await autoTrainFromImageBuffer(buffer, caption);
       trainedVisualTokens = trainResult.learnedTokens;
       console.log(`📡 [Channel Auto-Trained] New image processed. Total: ${trainResult.totalTrained}`);
+
+      // Send confirmation to the channel so users get immediate response
+      const msg =
+        `🧠 <b>Channel Aesthetic Learning Complete!</b>\n\n` +
+        `📥 <b>Photo Ingested & Analyzed</b>\n` +
+        `📊 <b>Total Dataset:</b> ${trainResult.totalTrained} images\n` +
+        `🎨 <b>Active Features:</b> ${escapeHtml(trainResult.newInsight)}\n` +
+        `✨ <b>Model Weights Updated in RAM!</b> (0 KB Disk used)`;
+
+      await sendSafeMessage(channelChatId, msg);
       return;
     }
 
     const promptText = ("text" in post ? post.text : "") || "";
     if (!promptText || promptText.startsWith("/")) return;
 
-    const waitMsg = await ctx.telegram.sendMessage(channelChatId, "🎨 *NovaCraft AI:* Generating clean artwork...", {
-      parse_mode: "Markdown",
+    const waitMsg = await ctx.telegram.sendMessage(channelChatId, "🎨 <b>NovaCraft AI:</b> Generating clean artwork...", {
+      parse_mode: "HTML",
     });
 
     const cleanBuffer = await generateCleanImageBuffer(promptText);
 
     await ctx.telegram.sendPhoto(channelChatId, { source: cleanBuffer }, {
-      caption: `✨ *NovaCraft AI Clean Creation*\n📝 *Prompt:* ${promptText}`,
-      parse_mode: "Markdown",
+      caption: `✨ <b>NovaCraft AI Clean Creation</b>\n📝 <b>Prompt:</b> ${escapeHtml(promptText)}`,
+      parse_mode: "HTML",
     });
 
     try {

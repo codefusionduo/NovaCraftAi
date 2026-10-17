@@ -1,17 +1,21 @@
 {
-  "totalAnalyzed": 499,
+  "totalAnalyzed": 546,
   "contrastProfile": "high dynamic contrast (HDR)",
   "lightingTone": "studio softbox illumination",
   "paletteMood": "vibrant natural",
   "learnedTokens": [
-    "high definition",
-    "masterpiece composition",
-    "sharp focus",
-    "studio lighting",
-    "octane render finish",
-    "8k hyperdetailed",
-    "high dynamic range",
-    "intense detail"
+    "warm golden cinematic lighting",
+    "sunset amber tones",
+    "soft subtle gradients",
+    "smooth visual tones",
+    "studio softbox illumination",
+    "clean neutral lighting",
+    "high dynamic range HDR",
+    "ultra crisp details",
+    "cool moonlight aesthetic",
+    "neon cyber glow",
+    "dark moody atmospheric rim lighting",
+    "film noir shadows"
   ],
-  "updatedAt": "2026-10-13T05:51:43.548Z"
+  "updatedAt": "2026-10-17T07:03:28.164Z"
 }
