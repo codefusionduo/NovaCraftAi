@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: novacraft-ai
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:all
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.43
+      - key: TELEGRAM_BOT_TOKEN
+        value: 8469994558:AAH_Hr4pxr1nTnMuRKXzBIOgUVrYqo3dQ10
+      - key: TELEGRAM_CHANNEL_ID
+        value: "-1004461650802"
+      - key: TELEGRAM_API_ID
+        value: "39893689"
+      - key: TELEGRAM_API_HASH
+        value: "6818fd0ee55b94282f29419e464cc36d"

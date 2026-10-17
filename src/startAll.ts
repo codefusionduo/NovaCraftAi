@@ -12,9 +12,9 @@ botProcess.on("exit", (code) => {
   console.log(`Telegram Bot process exited with code ${code}`);
 });
 
-// Start Next.js Server (binds to Render PORT or default 3000)
+// Start Next.js Server (binds to Render PORT or default 3000, 0.0.0.0 for all interfaces)
 const port = process.env.PORT || "3000";
-const nextProcess = spawn("npx", ["next", "start", "-p", port], {
+const nextProcess = spawn("npx", ["next", "start", "-p", port, "-H", "0.0.0.0"], {
   stdio: "inherit",
   shell: true,
 });
