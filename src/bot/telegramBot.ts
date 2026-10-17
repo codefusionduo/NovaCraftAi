@@ -1,6 +1,7 @@
 import { Telegraf } from "telegraf";
 import dotenv from "dotenv";
 import fs from "fs";
+import path from "path";
 import sharp from "sharp";
 import { autoTrainFromImageBuffer, getTrainedWeights } from "./autoTrainer";
 
@@ -286,9 +287,66 @@ bot.on("document", async (ctx) => {
       );
     }
   } catch (err) {
-    console.error("Error processing document image:", err);
+// In-memory & JSON file video dataset tracker
+const VIDEO_REGISTRY_PATH = path.join(process.cwd(), "trained_video_dataset.json");
+
+interface VideoRecord {
+  file_id: string;
+  caption: string;
+  added_at: string;
+  file_name?: string;
+}
+
+function getVideoRegistry(): VideoRecord[] {
+  try {
+    if (fs.existsSync(VIDEO_REGISTRY_PATH)) {
+      return JSON.parse(fs.readFileSync(VIDEO_REGISTRY_PATH, "utf-8"));
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveVideoRecord(record: VideoRecord) {
+  const current = getVideoRegistry();
+  // Avoid duplicate entries
+  if (!current.some((v) => v.file_id === record.file_id)) {
+    current.push(record);
+    fs.writeFileSync(VIDEO_REGISTRY_PATH, JSON.stringify(current, null, 2), "utf-8");
+  }
+}
+
+// 5b. Automatic Ingestion of Video Clips for LoRA Training
+bot.on(["video", "animation"], async (ctx) => {
+  try {
+    const video = (ctx.message as any).video || (ctx.message as any).animation;
+    if (!video) return;
+
+    const fileId = video.file_id;
+    const caption = ctx.message.caption || "";
+
+    saveVideoRecord({
+      file_id: fileId,
+      caption: caption,
+      added_at: new Date().toISOString(),
+      file_name: (video as any).file_name || `clip_${Date.now()}.mp4`,
+    });
+
+    const totalVideos = getVideoRegistry().length;
+    console.log(`🎥 [Video Ingested] File ID: ${fileId} | Total Videos: ${totalVideos}`);
+
+    await sendSafeMessage(
+      ctx.chat.id,
+      `🎬 <b>Video Clip Saved to Training Dataset!</b>\n\n` +
+        `📥 <b>File ID:</b> <code>${fileId}</code>\n` +
+        `📝 <b>Caption:</b> ${caption ? escapeHtml(caption) : "<i>(Will be auto-captioned via Qwen2-VL)</i>"}\n` +
+        `📊 <b>Total Video Dataset:</b> ${totalVideos} clips\n` +
+        `⚡ <b>Ready for Colab LoRA Fine-Tuning!</b>`
+    );
+  } catch (err) {
+    console.error("Error processing incoming video:", err);
   }
 });
+
 
 // 6. Style Commands
 bot.command("generate", async (ctx) => {
@@ -346,6 +404,32 @@ bot.on("channel_post", async (ctx) => {
         `✨ <b>Model Weights Updated in RAM!</b> (0 KB Disk used)`;
 
       await sendSafeMessage(channelChatId, msg);
+      return;
+    }
+
+    // Auto-save channel videos
+    if ("video" in post && post.video) {
+      const vid = post.video;
+      const fileId = vid.file_id;
+      const caption = post.caption || "";
+
+      saveVideoRecord({
+        file_id: fileId,
+        caption: caption,
+        added_at: new Date().toISOString(),
+        file_name: vid.file_name || `channel_clip_${Date.now()}.mp4`,
+      });
+
+      const totalVideos = getVideoRegistry().length;
+      console.log(`🎥 [Channel Video Ingested] File ID: ${fileId} | Total: ${totalVideos}`);
+
+      await sendSafeMessage(
+        channelChatId,
+        `🎬 <b>Channel Video Saved to LoRA Dataset!</b>\n\n` +
+          `📥 <b>File ID:</b> <code>${fileId}</code>\n` +
+          `📊 <b>Total Dataset:</b> ${totalVideos} video clip(s)\n` +
+          `⚡ <b>Ready for Colab Training!</b>`
+      );
       return;
     }
 
