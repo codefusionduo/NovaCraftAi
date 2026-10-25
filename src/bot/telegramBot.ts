@@ -287,6 +287,10 @@ bot.on("document", async (ctx) => {
       );
     }
   } catch (err) {
+    console.error("Error processing document image:", err);
+  }
+});
+
 // In-memory & JSON file video dataset tracker
 const VIDEO_REGISTRY_PATH = path.join(process.cwd(), "trained_video_dataset.json");
 
