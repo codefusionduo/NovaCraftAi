@@ -489,13 +489,21 @@ async function handleGenerateAndReply(ctx: any, prompt: string, style = "photore
   }
 }
 
-// Start polling
-bot.launch().then(() => {
-  console.log("🚀 NovaCraft Zero-Storage & Watermark-Free Bot started!");
-  if (CHANNEL_ID) {
-    console.log(`📡 Monitoring Channel: ${CHANNEL_ID}`);
-  }
-});
+// Start polling with dropPendingUpdates and explicit allowed_updates
+bot
+  .launch({
+    dropPendingUpdates: true,
+    allowedUpdates: ["message", "channel_post", "edited_message", "callback_query"],
+  })
+  .then(() => {
+    console.log("🚀 NovaCraft Zero-Storage & Watermark-Free Bot started and listening!");
+    if (CHANNEL_ID) {
+      console.log(`📡 Monitoring Channel: ${CHANNEL_ID}`);
+    }
+  })
+  .catch((err) => {
+    console.error("❌ Bot launch error:", err);
+  });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
